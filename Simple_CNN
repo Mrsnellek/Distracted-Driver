@@ -1,0 +1,148 @@
+
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
+
+import os
+import cv2
+import pandas as pd
+get_ipython().magic('matplotlib inline')
+import matplotlib
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
+from keras.utils import np_utils
+from sklearn import preprocessing
+from sklearn.preprocessing import LabelEncoder
+from keras.datasets import cifar10
+from keras.preprocessing.image import ImageDataGenerator
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+from keras.optimizers import SGD, Adam
+from keras.utils import np_utils
+from sklearn.metrics import log_loss
+from scipy.misc import imread, imresize
+from keras.layers.convolutional import Convolution2D, MaxPooling2D
+import keras
+import random
+import glob
+from keras.utils import to_categorical
+from keras.layers.normalization import BatchNormalization
+import time
+from keras.optimizers import Adam
+from keras.layers import Dropout
+
+path = 'C:/Users/Ruthie Pie/Documents/Data Science/Deep Learning/Distracted Driver/data/'
+df = pd.read_csv(path + '/driver_imgs_list.csv')
+by_drivers = df.groupby('subject')
+by_images = df.groupby('img')
+unique_drivers = by_drivers.groups.keys()
+
+files = sorted(glob.glob(path+'train/*/*.jpg'))
+len(files)
+
+c0 = plt.imread(files[0]) #read file path to an image, now c0 is a numpy image
+print(c0.shape)
+
+plt.imshow(c0)
+
+data=[]
+for i in files:
+    img = cv2.imread(i, 0)
+    edges = cv2.Canny(img, 100, 200)
+    img = cv2.resize(edges, (int(edges.shape[1]/4), int(edges.shape[0]/4)), interpolation = cv2.INTER_AREA)
+    data.append(img)
+X = np.asarray(data)
+X_train = X.reshape(X.shape[0], X.shape[1], X.shape[2], 1).astype('float32')
+
+X_train=X_train/255
+
+np.save('train', X_train)
+
+c0 = np.empty(len(sorted(glob.glob(path+'train/c0/*.jpg'))))
+c0.fill(0)
+c1 = np.empty(len(sorted(glob.glob(path+'train/c1/*.jpg'))))
+c1.fill(1)
+c2 = np.empty(len(sorted(glob.glob(path+'train/c2/*.jpg'))))
+c2.fill(2)
+c3 = np.empty(len(sorted(glob.glob(path+'train/c3/*.jpg'))))
+c3.fill(3)
+c4 = np.empty(len(sorted(glob.glob(path+'train/c4/*.jpg'))))
+c4.fill(4)
+c5 = np.empty(len(sorted(glob.glob(path+'train/c5/*.jpg'))))
+c5.fill(5)
+c6 = np.empty(len(sorted(glob.glob(path+'train/c6/*.jpg'))))
+c6.fill(6)
+c7 = np.empty(len(sorted(glob.glob(path+'train/c7/*.jpg'))))
+c7.fill(7)
+c8 = np.empty(len(sorted(glob.glob(path+'train/c8/*.jpg'))))
+c8.fill(8)
+c9 = np.empty(len(sorted(glob.glob(path+'train/c9/*.jpg'))))
+c9.fill(9)
+
+y = np.concatenate([c0, c1, c2, c3, c4, c5, c6, c7, c8, c9])
+y = to_categorical(y)
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X_train, y, test_size = .20, random_state=123)
+
+test_file = glob.glob(path+'test/*.jpg')
+
+test_data=[]
+for i in test_file:
+    img = cv2.imread(i, 0)
+    edges = cv2.Canny(img, 100, 200)
+    img = cv2.resize(edges, (int(edges.shape[1]/4), int(edges.shape[0]/4)), interpolation = cv2.INTER_AREA)
+    test_data.append(img)
+test = np.asarray(test_data)
+test = test.reshape(test.shape[0], test.shape[1], test.shape[2], 1).astype('float32')
+
+test = test/255
+
+np.save('test', test)
+
+def model_drop1():
+    
+    model = Sequential()
+    
+    model.add(Conv2D(16, kernel_size=(3, 3), input_shape=(120, 160 , 1), padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+
+    model.add(Conv2D(16, (3, 3),padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))    
+    model.add(MaxPooling2D((2, 2),padding='same'))
+
+    model.add(Flatten())
+    model.add(Dense(16))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+   
+    model.add(Dense(10, activation='softmax'))
+    
+    model.compile(loss= 'categorical_crossentropy' , optimizer= 'adam' , metrics=[ 'accuracy' ])
+    
+    return model
+
+model_1 = model_drop1()
+
+t0=time.time()
+tune = model_1.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=20, batch_size=32, verbose=2)
+t1=time.time()
+print(t1-t0," seconds")
+
+scores = model_1.evaluate(X_test, y_test, verbose=0)
+print("CNN Error: %.2f%%" % (100-scores[1]*100))
+
+
+prediction_final = model_1.predict(test)
+
+column = ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9']
+indexes = os.listdir(path + 'test/')
+
+df = pd.DataFrame(prediction_final, index = indexes, columns = column)
+df.columns.name = 'img'
+df
+
+df.to_csv('C:/Users/Ruthie Pie/Documents/Data Science/Deep Learning/Distracted Driver/data/prediction_final_1.csv')
